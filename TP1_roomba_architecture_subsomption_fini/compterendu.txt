@@ -1,0 +1,78 @@
+TP_1 IAR compte rendu
+
+__________________
+
+Jarry Baptiste
+Zanivan Thomas
+__________________
+
+remarque: on peut modifier les senseurs du robot simulé dans envs/example.xml
+
+On à légèrement augmenté l'angle du capteur des lasers ainsi:
+  <laser_scanner angle_min="-30" angle_max="30" angle_inc="1" range="3000"/>
+
+__________________
+
+Suivi de mur
+
+1. pour avancer tout droite on change les moteurs en :
+
+    v.speed_left=1
+    v.speed_right=1
+
+2. le code de la boucle permettant de reculer quand on touche un bumper est le suivant, on commence par reculer un certain temps puis tourner un autre temps, puis désactiver le comportement jusqu'à réactivation d'un des bumpers.
+
+while not rospy.is_shutdown():
+        # compute the value of v that will be sent to the subsomption channel. 
+	if (bumper_r or bumper_l):
+		flag_bumper = True
+
+	if flag_bumper and timer_bumper<10:
+		v.speed_left=-1
+    		v.speed_right=-1
+    		v.activated=True
+		timer_bumper += 1
+        elif flag_bumper and timer_bumper<15: #a ajuster
+		v.speed_left=+1
+    		v.speed_right=-1
+    		v.activated=True
+		timer_bumper += 1
+	elif flag_bumper:
+		v.activated=False
+		timer_bumper = 0
+		flag_bumper= False
+		
+	#publish v
+        pub.publish(v)
+        r.sleep()   
+    
+
+3. 
+
+Dans ce comportement nous n'utilisons pas de compteur (timer) de durée de mouvement et on suppose que le robot tourne jusqu'à être débloqué.
+
+Avec un premier comportement naïf, on à constaté que parfois dans les coins le robot oscille entre une rotation à droite et à gauche, et peut ainsi rentrer dans des boucles qui font perdre beaucoup de temps inutilement.
+Pour résoudre cela on a utilisé deux flag: flag_right et flag_left afin que le robot s'interdise de tourner dans l'autre sens avant d'avoir fini son premier mouvement. Cela réduit massivement les cas de comportements oscillatoires.
+
+4.
+
+pour suivre les murs on change les priorités:
+0 -> avancer
+1 -> evite collisions (laser)
+2 -> suivre les murs
+3 -> bumpers demi-tour
+
+on a découpé le laser en 3 parties: gauche 30% / milieu 40 % / droit 30%
+ensuite on calcule le minimum de chacune de ces parties
+
+ensuite on regarde si on a un obstacle en face (partie milieu du laser < seuilcentre), auquel cas on desactive le comportement (pour retomber dans le comportement evite_collisions) ou alors bumpers_demitour va s'activer lors de la collision
+On désactive aussi le comportement si on est trop proche d'un mur sur le coté (seuilcoté) pour passer en évite_collision
+
+Sinon si on observe un mur à gauche sans obstacle devant, on avance, et si on détecte alors qu'on s'en éloigne trop on s'en rapproche. Idem pour le mur à droite
+
+
+depuis le compte rendu vu en cours, on à affiné les paramètres pour avoir un comportement plus fluide et qui évite mieux les murs.
+
+
+
+
